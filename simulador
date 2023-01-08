@@ -1,0 +1,308 @@
+#include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
+
+/* inicio: prototipos */
+
+/* s = posicao; v = velocidade; a = aceleracao; m = massa; b = corpo */
+
+double b0_sx, b0_sy;
+double b0_vx, b0_vy;
+double b0_ax, b0_ay;
+double b0_m;
+double b0_resultantex, b0_resultantey;
+
+double b1_sx, b1_sy;
+double b1_vx, b1_vy;
+double b1_ax, b1_ay;
+double b1_m;
+double b1_resultantex, b1_resultantey;
+
+double b2_sx, b2_sy;
+double b2_vx, b2_vy;
+double b2_ax, b2_ay;
+double b2_m;
+double b2_resultantex, b2_resultantey;
+
+
+/* t = tempo; tmax = tempo maximo; simu_dt = variacao do tempo na simulacao;
+dist = distancia entre os corpos; p = pontos dos centros de gravidade (x,y); grav = gravitacao
+considere 3 corpos : 1 principal e 2 atratores*/
+
+double t, simu_dt, tmax;
+double dist(double p1x, double p1y, double p2x, double p2y);
+double grav(double m1, double m2, double dist);
+
+void atualize(double *x, double *y, double *vx, double *vy, double ax, double ay, double dt);
+void test(double valor, double expected);
+void vetor_unitario(double *x, double *y, double cx1, double cy1, double cx2, double cy2);
+void escala_vetor(double fator, double x, double y, double *ex, double *ey);
+void soma_vetor(double x, double y, double x1, double y1, double *sx, double *sy);
+void cria_vetor(double x, double y, double x1, double y1, double *dx, double *dy);
+
+void calcula_corpo(double principal_x, double principal_y, double principal_m,
+                     double atrator1_x, double atrator1_y, double atrator1_m,
+                     double atrator2_x, double atrator2_y, double atrator2_m,
+                     double *resultante_x, double *resultante_y);
+
+double forca(char c, int i,
+            double x0, double y0, double m0,
+            double x1, double y1, double m1,
+            double x2, double y2, double m2);
+
+void calcula_forcas(double x0, double y0, double m0,
+                    double x1, double y1, double m1,
+                    double x2, double y2, double m2);
+
+void simulacao(void);
+void leitura_entrada(void);
+
+/* fim: prototipos */
+
+int main() {
+
+    leitura_entrada();
+
+    simulacao();
+
+    return 0;
+}
+
+/* 'void all_tests' é a função criada apenas para testar alguns valores nos problemas.
+é interessante para verificar se o programa funciona bem*/
+
+void all_tests(void) {
+
+double cx, cy, vx, vy, ax, ay, deltat, x, y;
+
+test(grav(6e+24, 2e+27, 6e+11), 2.23e+18);
+    test(grav(50, 100, 1.5e-4), 13.4);
+    test(grav(0, 0, 1), 0);
+    test(dist(0,0,3,4), 5);
+    test(dist(0,0,0,1), 1);
+    test(dist(-20, 0, 0, 0), 20);
+    test(dist(0,-100,0,-50), 50);
+
+    vetor_unitario (&x, &y, 0, 0, 0, 10);
+    test(x, 0);
+    test(y, 1);
+
+    vetor_unitario (&x, &y, 0, 0, 1, 1);
+    test(x, sqrt(2)/2);
+    test(y, sqrt(2)/2);
+
+    escala_vetor(10, 1, 2, &x, &y);
+    test(x, 10);
+    test(y, 20);
+
+    soma_vetor(1, 2, 3, 4, &x, &y);
+    test(x, 4);
+    test(y, 6);
+
+    cx = 5;
+    cy = 5;
+    vx = 4;
+    vy = 4;
+    ax = 1;
+    ay = 1;
+    deltat = 2;
+
+    atualize (&cx, &cy, &vx, &vy, ax, ay, deltat);
+    test(vx, 6);
+    test(vy, 6);
+    test(cx, 17);
+    test(cy, 17);
+}
+
+void test(double valor, double expected)
+{
+    if (valor == expected) {
+        printf("sucesso!\n");
+    }
+    else {
+        printf("falha %g diferente de %g!\n", valor, expected);
+    }
+}
+/* fim dos testes*/
+
+
+/* 'void atualize' recebe a posição (*x, *y), a velocidade (*vx , *vy) e a aceleração (ax , ay)
+de um corpo em um dado instante t, e atualiza os valores de (*vx , *vy) e (*x, *y), em que variação do tempo = dt,
+de forma que (*x, *y) torna-se a posição do corpo no instante t + dt.  */
+
+void atualize(double *x, double *y,
+              double *vx, double *vy,
+              double ax, double ay, double dt)
+{
+    *vx = *vx + ax * dt;
+    *vy = *vy + ay * dt;
+    *x = *x + *vx * dt;
+    *y = *y + *vy * dt;
+}
+
+/* 'double dist' calcula a distancia entre os centros de gravidade de dois corpos  */
+
+double dist(double p1x, double p1y, double p2x, double p2y){
+    double dx = p1x - p2x;
+    double dy = p1y - p2y;
+    return sqrt((dx * dx) + (dy * dy));
+}
+
+/* 'double grav' calcula a forca de atracao gravitacional, em que G é a constante de gravitacao universal,
+m são as massas dos corpos e dist é a distancia entre elas  */
+
+double grav(double m1, double m2, double dist) {
+    double G = 6.67e-11;
+    return G * m1 * m2 / (dist * dist);
+    }
+/* as 4 proximas funcoes calculam vetores */
+
+void vetor_unitario(double *x, double *y, double cx1, double cy1, double cx2, double cy2) {
+    *x = cx2 - cx1;
+    *y = cy2 - cy1;
+    *x = *x / dist (cx1, cy1, cx2, cy2);
+    *y = *y / dist (cx1, cy1, cx2, cy2);
+    }
+
+    void escala_vetor(double fator, double x, double y, double *ex, double *ey) {
+    *ex = fator * x;
+    *ey = fator * y;
+    }
+
+    void soma_vetor(double x, double y, double x1, double y1, double *sx, double *sy) {
+    *sx = x + x1;
+    *sy = y + y1;
+    }
+
+    void cria_vetor(double x, double y, double x1, double y1, double *dx, double *dy){
+    *dx = x1 - x;
+    *dy = y1 - y;
+    }
+
+void calcula_forcas(double x0, double y0, double m0,
+    double x1, double y1, double m1,
+    double x2, double y2, double m2){
+
+    calcula_corpo(x0, y0, m0, x1, y1, m1, x2, y2, m2, &b0_resultantex, &b0_resultantey);
+    calcula_corpo(x1, y1, m1, x0, y0, m0, x2, y2, m2, &b1_resultantex, &b1_resultantey);
+    calcula_corpo(x2, y2, m2, x0, y0, m0, x1, y1, m1, &b2_resultantex, &b2_resultantey);
+
+    }
+/*Esta função recebe um caractere c que pertence a {’x’, ’y’}, um inteiro i que pertence a {0, 1, 2}, e dados
+que especificam três corpos: corpo b0 na posição (x0, y0) com massa m0, b1 na posição (x1, y1) com massa m1, e
+b2 na posição (x2, y2) com massa m2. Esta função devolve a resultante da força gravitacional total que os corpos exercem
+sobre i*/
+
+double forca(char c, int i,
+    double x0, double y0, double m0,
+    double x1, double y1, double m1,
+    double x2, double y2, double m2) {
+
+        calcula_forcas(x0, y0, m0, x1, y1, m1, x2, y2, m2);
+        if(c == 'x') {
+            if (i == 0) {
+                return b0_resultantex;
+            }
+             if (i == 1) {
+                return b1_resultantex;
+            }
+             if (i == 2) {
+                return b2_resultantex;
+            }
+        }
+        if(c == 'y') {
+            if (i == 0) {
+                return b0_resultantey;
+            }
+             if (i == 1) {
+                return b1_resultantey;
+            }
+             if (i == 2) {
+                return b2_resultantey;
+            }
+        }
+        return 0;
+        }
+
+void calcula_corpo(double principal_x, double principal_y, double principal_m,
+                double atrator1_x, double atrator1_y, double atrator1_m,
+                double atrator2_x, double atrator2_y, double atrator2_m,
+                double *resultante_x, double *resultante_y) {
+
+    double dx, dy;
+    double g;
+    double d;
+    double f0x, f0y;
+    double f1x, f1y;
+
+    vetor_unitario(&dx, &dy, principal_x, principal_y, atrator1_x, atrator1_y);
+    d = dist(principal_x, principal_y, atrator1_x, atrator1_y);
+    g = grav(principal_m, atrator1_m, d);
+    escala_vetor(g, dx, dy, &f0x, &f0y);
+
+    vetor_unitario(&dx, &dy, principal_x, principal_y, atrator2_x, atrator2_y);
+    d = dist(principal_x, principal_y, atrator2_x, atrator2_y);
+    g = grav(principal_m, atrator2_m, d);
+    escala_vetor(g, dx, dy, &f1x, &f1y);
+
+    soma_vetor(f0x, f0y, f1x, f1y, resultante_x, resultante_y);
+
+}
+
+void simulacao(void) {
+    t = 0;
+    while (t <= tmax) {
+        double f0x, f0y, f1x, f1y, f2x, f2y;
+        t = t + simu_dt;
+
+        f0x = forca('x', 0, b0_sx, b0_sy, b0_m,
+                    b1_sx, b1_sy, b1_m,
+                    b2_sx, b2_sy, b2_m);
+
+        f0y = forca('y', 0, b0_sx, b0_sy, b0_m,
+                    b1_sx, b1_sy, b1_m,
+                    b2_sx, b2_sy, b2_m);
+
+        f1x = forca('x', 1, b0_sx, b0_sy, b0_m,
+                    b1_sx, b1_sy, b1_m,
+                    b2_sx, b2_sy, b2_m);
+
+        f1y = forca('y', 1, b0_sx, b0_sy, b0_m,
+                    b1_sx, b1_sy, b1_m,
+                    b2_sx, b2_sy, b2_m);
+
+        f2x = forca('x', 2, b0_sx, b0_sy, b0_m,
+                    b1_sx, b1_sy, b1_m,
+                    b2_sx, b2_sy, b2_m);
+
+        f2y = forca('y', 2, b0_sx, b0_sy, b0_m,
+                    b1_sx, b1_sy, b1_m,
+                    b2_sx, b2_sy, b2_m);
+
+/* calculo da aceleracao. a(x,y) = f(x,y) / massa */
+
+        b0_ax = f0x / b0_m;
+        b0_ay = f0y / b0_m;
+
+        b1_ax = f1x / b1_m;
+        b1_ay = f1y / b1_m;
+
+        b2_ax = f2x / b2_m;
+        b2_ay = f2y / b2_m;
+
+        atualize(&b0_sx, &b0_sy, &b0_vx, &b0_vy, b0_ax, b0_ay, simu_dt);
+        atualize(&b1_sx, &b1_sy, &b1_vx, &b1_vy, b1_ax, b1_ay, simu_dt);
+        atualize(&b2_sx, &b2_sy, &b2_vx, &b2_vy, b2_ax, b2_ay, simu_dt);
+        printf("%g %g %g %g %g %g\n", b0_sx, b0_sy, b1_sx, b1_sy, b2_sx, b2_sy);
+    }
+}
+
+void leitura_entrada(void) {
+    scanf("%lf %lf %lf %lf %lf\n", &b0_sx, &b0_sy, &b0_vx, &b0_vy, &b0_m);
+    scanf("%lf %lf %lf %lf %lf\n", &b1_sx, &b1_sy, &b1_vx, &b1_vy, &b1_m);
+    scanf("%lf %lf %lf %lf %lf\n", &b2_sx, &b2_sy, &b2_vx, &b2_vy, &b2_m);
+    scanf("\n");
+    scanf("%lf %lf\n", &tmax, &simu_dt);
+
+
+}
